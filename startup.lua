@@ -1,5 +1,5 @@
-local log = require("log")
-local thread = require("thread")
+local log = require("lib.log")
+local thread = require("lib.thread")
 
 thread.add(function()
     shell.run("main")
