@@ -3,7 +3,7 @@
 ---@field requestId number
 ---@field data string|number|boolean|nil|table
 
-local log = require("log")
+local log = require("lib.log")
 
 local out = {}
 
