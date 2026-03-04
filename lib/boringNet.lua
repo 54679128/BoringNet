@@ -119,7 +119,7 @@ function out.send(id, data, protocol)
                     ---@cast message boringNet.message
                     if message.type ~= out.messageType.ACK then
                         log.debug(("Receive a message: %s but it isn't a ack message"):format(textutils.serialise(
-                        message)))
+                            message)))
                         goto continue
                     end
                     if message.requestId ~= requestId then
