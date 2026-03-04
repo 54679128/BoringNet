@@ -4,6 +4,7 @@
 ---@field data string|number|boolean|nil|table
 
 local log = require("lib.log")
+local thread = require("lib.thread")
 
 local out = {}
 
@@ -51,29 +52,31 @@ function out.broadcast(data, protocol)
     local sendMessage = { type = out.messageType.SEND, requestId = requestId, data = data }
     rednet.broadcast(sendMessage, protocol)
     local receivers = {}
-    parallel.waitForAny(function()
-        while true do
-            local senderId, message = rednet.receive(protocol)
-            if not isMessage(message) then
-                log.debug(("Receive a message but it isn't a legal message"))
-                goto continue
-            end
-            ---@cast message boringNet.message
-            if message.type ~= out.messageType.ACK then
-                log.debug(("Receive a message but it isn't a ack message"))
-                goto continue
-            end
-            if message.requestId ~= requestId then
-                log.debug(("Receive a ack message but is isn't request one"))
-                goto continue
-            end
+    thread.add(function()
+        parallel.waitForAny(function()
+            while true do
+                local senderId, message = rednet.receive(protocol)
+                if not isMessage(message) then
+                    log.debug(("Receive a message but it isn't a legal message"))
+                    goto continue
+                end
+                ---@cast message boringNet.message
+                if message.type ~= out.messageType.ACK then
+                    log.debug(("Receive a message but it isn't a ack message"))
+                    goto continue
+                end
+                if message.requestId ~= requestId then
+                    log.debug(("Receive a ack message but is isn't request one"))
+                    goto continue
+                end
 
-            log.debug(("Success send a message: %s to %d"):format(debugData, senderId))
-            table.insert(receivers, senderId)
-            ::continue::
-        end
-    end, function()
-        os.sleep(2)
+                log.debug(("Success send a message: %s to %d"):format(debugData, senderId))
+                table.insert(receivers, senderId)
+                ::continue::
+            end
+        end, function()
+            os.sleep(2)
+        end)
     end)
     if not next(receivers) then
         return nil
@@ -102,33 +105,36 @@ function out.send(id, data, protocol)
     rednet.send(id, sendMessage, protocol)
     for i = 1, 3, 1 do
         local done = false
-        parallel.waitForAny(function()
-            while true do
-                local senderId, message = rednet.receive(protocol)
-                if senderId ~= id then
-                    goto continue
-                end
-                if not isMessage(message) then
-                    log.debug(("Receive a message but it isn't a legal message"))
-                    goto continue
-                end
-                ---@cast message boringNet.message
-                if message.type ~= out.messageType.ACK then
-                    log.debug(("Receive a message: %s but it isn't a ack message"):format(textutils.serialise(message)))
-                    goto continue
-                end
-                if message.requestId ~= requestId then
-                    log.debug(("Receive a ack message but is isn't request one"))
-                    goto continue
-                end
+        thread.add(function()
+            parallel.waitForAny(function()
+                while true do
+                    local senderId, message = rednet.receive(protocol)
+                    if senderId ~= id then
+                        goto continue
+                    end
+                    if not isMessage(message) then
+                        log.debug(("Receive a message but it isn't a legal message"))
+                        goto continue
+                    end
+                    ---@cast message boringNet.message
+                    if message.type ~= out.messageType.ACK then
+                        log.debug(("Receive a message: %s but it isn't a ack message"):format(textutils.serialise(
+                        message)))
+                        goto continue
+                    end
+                    if message.requestId ~= requestId then
+                        log.debug(("Receive a ack message but is isn't request one"))
+                        goto continue
+                    end
 
-                log.debug(("Success send a message: %s to %d"):format(debugData, id))
+                    log.debug(("Success send a message: %s to %d"):format(debugData, id))
 
-                done = true
-                ::continue::
-            end
-        end, function()
-            os.sleep(1)
+                    done = true
+                    ::continue::
+                end
+            end, function()
+                os.sleep(1)
+            end)
         end)
         if done then
             return true
